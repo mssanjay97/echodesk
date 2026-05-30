@@ -1,0 +1,43 @@
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_HOST=redis
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./chromadb-persistent-store:/data
+    environment:
+      - CHROMA_HOST=chromadb
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - 5000:5000
+    volumes:
+      - ./data-store:/app/data-store
+    environment:
+      - QUEUE_NAME=url
+      - CHROMA_HOST=chromadb
+      - REDIS_HOST=redis
+    depends_on:
+      - chromadb
+      - redis
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    ports:
+      - 5001:5001
+    environment:
+      - QUEUE_NAME=url
+      - CHROMA_HOST=chromadb
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+      - chromadb
