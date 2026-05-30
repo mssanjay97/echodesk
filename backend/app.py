@@ -1,19 +1,26 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import redis
-from rq import Queue
+from rq import Queue, Retry
 from scraper import scraper
 import os
+import json
+import hashlib
 
 redis_host = os.getenv('REDIS_HOST') or 'localhost'
-queue_name = os.getenv('QUEUE_NAME') or 'url'
+queue_name = os.getenv('QUEUE_NAME') or 'ingestion'
 
-conn = redis.Redis(host=redis_host, port = 6379)
+conn = redis.Redis(host=redis_host, port = 6379, decode_responses = True)
 q = Queue(queue_name, connection=conn)
 
 app = Flask(__name__)
 CORS(app)
 
+def generate_cache_key(query, userId):
+    query_hash = hashlib.sha256(query.strip().lower().encode()).hexdigest()
+    return f"search:{userId}:{query_hash}"
+
+"""
 @app.route("/api/v1/queries", methods = ["POST"])
 def queryHistory():
     try:
@@ -29,9 +36,44 @@ def queryHistory():
         return jsonify({"documents": results["documents"][0], "metadata": results["metadatas"][0]}), 200
     
     except Exception as e:
-        print("Error in getQuery:", e)
-        return jsonify({"message":"getQuery failed"}), 400
+        print("Error in queryHistory:", e)
+        return jsonify({"message":"queryHistory failed"}), 400
+"""
 
+@app.route("/api/v1/queries", methods=["POST"])
+def queryHistory():
+    try:
+        data = request.get_json()
+
+        query, userId = None, None
+
+        if data:
+            query = data.get("query")
+            userId = data.get("userId")
+
+        print("search queries:", query, userId)
+
+        cache_key = generate_cache_key(query, userId)
+        cached_result = conn.get(cache_key)
+
+        if cached_result:
+            print("Cache HIT")
+            return jsonify(json.loads(cached_result)), 200
+
+        print("Cache MISS")
+
+        results = scraper.searchDB(query, userId)
+        print(" documents ",results["documents"][0])
+        response = { "documents": results["documents"][0], "metadata": results["metadatas"][0]}
+
+        conn.setex(cache_key, 3600, json.dumps(response))
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        print("Error in queryHistory:", e)
+        return jsonify({"message": "queryHistory failed"}), 400
+    
     
 
 @app.route("/api/v1/url", methods = ["POST"])
@@ -45,13 +87,13 @@ def parseAndStoreURL():
             title = data.get("title")
             userId = data.get("userId")
         
-        job = q.enqueue(scraper.scrapeUrl, url, title, userId, retry=3, retry_intervals=[10, 30, 60])
+        job = q.enqueue(scraper.scrapeUrl, url, title, userId, retry=Retry(max=3, interval=[10, 30, 60]))
         
         return jsonify({"message":"enqueued"}), 200
         
     except Exception as e:
-        print("Error in getUrl:", e)
-        return jsonify({"message":"getUrl failed"}), 400
+        print("Error in parseAndStoreURL:", e)
+        return jsonify({"message":"parseAndStoreURL failed"}), 400
 
 @app.route("/api/v1/content", methods = ["POST"])
 def storeContent():
@@ -65,13 +107,13 @@ def storeContent():
             userId = data.get("userId")
             timestamp = data.get("timestamp")
         
-        job = q.enqueue(scraper.storeContent, url, htmlText, userId, retry=3, retry_intervals=[10, 30, 60])
+        job = q.enqueue(scraper.storeContent, url, htmlText, userId, retry=Retry(max=3, interval=[10, 30, 60]))
         
         return jsonify({"message":"enqueued"}), 200
         
     except Exception as e:
-        print("Error in getUrl:", e)
-        return jsonify({"message":"getUrl failed"}), 400
+        print("Error in storeContent:", e)
+        return jsonify({"message":"storeContent failed"}), 400
     
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug = True)
