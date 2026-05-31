@@ -2,10 +2,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import redis
 from rq import Queue, Retry
-from scraper import scraper
+from services.scraper import scrapeUrl
 import os
 import json
 import hashlib
+from services.ingestion import ingestContent
+from services.search import searchDB
 
 redis_host = os.getenv('REDIS_HOST') or 'localhost'
 queue_name = os.getenv('QUEUE_NAME') or 'ingestion'
@@ -62,7 +64,7 @@ def queryHistory():
 
         print("Cache MISS")
 
-        results = scraper.searchDB(query, userId)
+        results = searchDB(query, userId)
         print(" documents ",results["documents"][0])
         response = { "documents": results["documents"][0], "metadata": results["metadatas"][0]}
 
@@ -87,7 +89,7 @@ def parseAndStoreURL():
             title = data.get("title")
             userId = data.get("userId")
         
-        job = q.enqueue(scraper.scrapeUrl, url, title, userId, retry=Retry(max=3, interval=[10, 30, 60]))
+        job = q.enqueue(scrapeUrl, url, title, userId, retry=Retry(max=3, interval=[10, 30, 60]))
         
         return jsonify({"message":"enqueued"}), 200
         
@@ -107,7 +109,7 @@ def storeContent():
             userId = data.get("userId")
             timestamp = data.get("timestamp")
         
-        job = q.enqueue(scraper.storeContent, url, htmlText, userId, retry=Retry(max=3, interval=[10, 30, 60]))
+        job = q.enqueue(ingestContent, url, htmlText, userId, timestamp, retry=Retry(max=3, interval=[10, 30, 60]))
         
         return jsonify({"message":"enqueued"}), 200
         

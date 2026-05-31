@@ -117,38 +117,101 @@ function isBlockedDomain(hostname: string): boolean {
   );
 }
 
+const HIGH_RISK_PATTERNS = [
+    /\b\d{3}-\d{2}-\d{4}\b/,                  // SSN
+    /\b4[0-9]{12}(?:[0-9]{3})?\b/,           // Visa
+    /\b5[1-5][0-9]{14}\b/,                   // Mastercard
+    /\b3[47][0-9]{13}\b/,                    // Amex
+    /\b\d{9}\b.*routing/i,
+    /\bprivate key\b/i,
+    /\bseed phrase\b/i,
+    /\brecovery phrase\b/i,
+    /\bwallet secret\b/i,
+    /\bapi key\b/i,
+    /\bsecret key\b/i,
+    /\baccess token\b/i,
+    /\brefresh token\b/i,
+    /\bclient secret\b/i,
+    /\baws_access_key_id\b/i,
+    /\baws_secret_access_key\b/i,
+    /\bgithub token\b/i,
+    /\bopenai api key\b/i,
+    /\bgoogle api key\b/i,
+    /\bbearer token\b/i
+];
+
+const MEDIUM_RISK_PATTERNS = [
+    /\bssn\b/i,
+    /\bsocial security number\b/i,
+    /\brouting number\b/i,
+    /\baccount number\b/i,
+    /\bcredit card\b/i,
+    /\bcvv\b/i,
+    /\bdebit card\b/i,
+    /\bchecking account\b/i,
+    /\bsavings account\b/i,
+    /\bpatient id\b/i,
+    /\bmedical record number\b/i,
+    /\binsurance member id\b/i,
+    /\bpassport number\b/i,
+    /\bdriver.?license\b/i,
+    /\bach transfer\b/i,
+    /\biban\b/i,
+    /\bswift code\b/i,
+    /\bbeneficiary\b/i,
+    /\bdate of birth\b/i,
+    /\bdob\b/i
+];
+
+const LOW_RISK_PATTERNS = [
+    /\bpassword\b/i,
+    /\bone-time password\b/i,
+    /\botp\b/i,
+    /\bmfa\b/i,
+    /\btwo-factor authentication\b/i,
+    /\blogin\b/i,
+    /\bsign in\b/i,
+    /\bverification code\b/i,
+    /\bsecurity question\b/i,
+    /\bsecurity answer\b/i,
+    /\binsurance claim\b/i,
+    /\bmedical record\b/i,
+    /\bprescription\b/i,
+    /\btax return\b/i,
+    /\bw-2\b/i,
+    /\b1099\b/i,
+    /\bauthenticator app\b/i,
+    /\bbackup codes\b/i,
+    /\bwallet address\b/i,
+    /\bmetamask\b/i,
+    /\btrezor\b/i,
+    /\bledger\b/i
+];
+
 function containsSensitiveContent(text: string): boolean {
+    let score = 0;
 
-    const SENSITIVE_PATTERNS = [
-        /social security/i,
-        /\bssn\b/i,
-        /routing number/i,
-        /account number/i,
-        /credit card/i,
-        /\bcvv\b/i,
-        /\bsecurity code\b/i,
-        /\bdebit card\b/i,
-        /\bchecking account\b/i,
-        /\bsavings account\b/i,
-        /\bwire transfer\b/i,
-        /\btax return\b/i,
-        /\bw-2\b/i,
-        /\b1099\b/i,
-        /\bmedical record\b/i,
-        /\bpatient id\b/i,
-        /\binsurance claim\b/i,
-        /\bprescription\b/i,
-        /\bpassword\b/i,
-        /\bone-time password\b/i,
-        /\botp\b/i,
-        /\bmfa\b/i,
-        /\btwo-factor authentication\b/i,
-        /\bprivate key\b/i,
-        /\bseed phrase\b/i,
-        /\brecovery phrase\b/i
-    ];
+    HIGH_RISK_PATTERNS.forEach(pattern => {
+        if (pattern.test(text)) {
+            score += 5;
+        }
+    });
 
-    return SENSITIVE_PATTERNS.some(pattern => pattern.test(text));
+    MEDIUM_RISK_PATTERNS.forEach(pattern => {
+        if (pattern.test(text)) {
+            score += 3;
+        }
+    });
+
+    LOW_RISK_PATTERNS.forEach(pattern => {
+        if (pattern.test(text)) {
+            score += 1;
+        }
+    });
+
+    console.log(`Sensitive content score: ${score}`);
+
+    return score >= 5;
 }
 
 function isSensitiveUrl(url: string): boolean {
@@ -183,7 +246,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
             console.log("Sensitive URL detected");
             return;
         }
-        
+
         const hostname = new URL(url).hostname;
 
         if (isBlockedDomain(hostname)) {
