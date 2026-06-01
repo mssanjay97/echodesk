@@ -218,3 +218,106 @@ domain blocking
 sensitive pattern detection
 private content filtering
 
+
+
+SYSTEM DESIGN: 
+
+
+1. Step 1: Clarify Requirements
+
+Must Have
+semantic search over browser history
+real-time ingestion
+fast query response
+
+Nice to Have
+ranking improvements
+caching
+scaling
+
+
+2. Step 2: Back-of-envelope estimation
+
+Assume:
+
+1000 users
+50 pages/day
+20 chunks/page
+
+→ 1M chunks/month
+
+Vector DB size grows linearly.
+
+
+3. Step 3: API Design
+
+Ingestion API
+POST /content
+
+Search API
+POST /queries
+
+
+4. Step 4: Database Design
+
+Tables:
+
+Vector DB:-
+
+id
+embedding
+url
+chunk
+timestamp
+userId
+
+Redis:-
+
+queue
+cache
+
+
+5. Step 5: High Level Design
+
+Same diagram as above.
+
+6. Step 6: Deep Dive Components
+
+A. Queue System
+Redis + RQ
+async ingestion
+retries
+
+B. Embedding System
+MiniLM model
+chunk-based embedding
+
+C. Search System
+vector similarity search
+top K retrieval
+
+
+7. Step 7: Bottlenecks
+
+Layer	Issue
+Vector DB	single node
+embedding	CPU heavy
+cache	cold start
+
+
+8. Step 8: Scaling
+
+Horizontal scaling:
+
+API → NGINX → replicas
+Workers → queue consumers
+Redis → cluster mode / Kubernetes
+
+
+9. Step 9: Trade-offs
+
+Choice  -   Trade-off
+
+ChromaDB    -   simple but not scalable
+Redis queue -   fast but memory-bound
+async ingestion -   eventual consistency
