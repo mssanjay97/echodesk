@@ -9,15 +9,8 @@ import hashlib
 
 
 def ingestContent(url, htmlText, userId, timestamp):
-    # soup = BeautifulSoup(htmlText, 'html.parser')
-    # for tag in soup(["script", "style", "noscript"]):
-    #     tag.extract()
-    # text = soup.get_text()
     
     text = extractText(htmlText)
-        
-    # collection_name = "history" + "_" + userId         
-    # collection = client.get_or_create_collection(name=collection_name, embedding_function=embedding_function)
     collection = getCollection(userId)
     
     content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()

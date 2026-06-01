@@ -8,39 +8,22 @@ import json
 import hashlib
 from services.ingestion import ingestContent
 from services.search import searchDB
+from config.redis_client import conn, cache_conn    
+from config.queues import q
+from services.cache import get, set, generate_cache_key
 
 redis_host = os.getenv('REDIS_HOST') or 'localhost'
 queue_name = os.getenv('QUEUE_NAME') or 'ingestion'
 
-conn = redis.Redis(host=redis_host, port = 6379, decode_responses = True)
-q = Queue(queue_name, connection=conn)
+# conn = redis.Redis(host=redis_host, port = 6379, decode_responses = True)
+# q = Queue(queue_name, connection=conn)
 
 app = Flask(__name__)
 CORS(app)
 
-def generate_cache_key(query, userId):
-    query_hash = hashlib.sha256(query.strip().lower().encode()).hexdigest()
-    return f"search:{userId}:{query_hash}"
-
-"""
-@app.route("/api/v1/queries", methods = ["POST"])
-def queryHistory():
-    try:
-        data = request.get_json()
-        query, userId = None, None
-        
-        if data:
-            query = data.get('query')
-            userId = data.get('userId')
-        print("search queries: ", query, userId)
-        results = scraper.searchDB(query, userId)
-        print(" documents ",results["documents"][0])
-        return jsonify({"documents": results["documents"][0], "metadata": results["metadatas"][0]}), 200
-    
-    except Exception as e:
-        print("Error in queryHistory:", e)
-        return jsonify({"message":"queryHistory failed"}), 400
-"""
+# def generate_cache_key(query, userId):
+#     query_hash = hashlib.sha256(query.strip().lower().encode()).hexdigest()
+#     return f"search:{userId}:{query_hash}"
 
 @app.route("/api/v1/queries", methods=["POST"])
 def queryHistory():
@@ -56,11 +39,11 @@ def queryHistory():
         print("search queries:", query, userId)
 
         cache_key = generate_cache_key(query, userId)
-        cached_result = conn.get(cache_key)
+        cached_result = get(cache_key)
 
         if cached_result:
             print("Cache HIT")
-            return jsonify(json.loads(cached_result)), 200
+            return jsonify(cached_result), 200
 
         print("Cache MISS")
 
@@ -68,7 +51,8 @@ def queryHistory():
         print(" documents ",results["documents"][0])
         response = { "documents": results["documents"][0], "metadata": results["metadatas"][0]}
 
-        conn.setex(cache_key, 3600, json.dumps(response))
+        #conn.setex(cache_key, 3600, json.dumps(response))
+        set(cache_key, response, ttl=3600)
 
         return jsonify(response), 200
 

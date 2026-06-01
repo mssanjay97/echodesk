@@ -1,5 +1,5 @@
-export default type QueryResponse = {
-  documents: string[],
-  metadata: { url: string;
-    timestamp: string; }[]
+export type QueryResponse = {
+  documents: string[];
+  metadata: { url: string,
+    timestamp: string }[]
 };
