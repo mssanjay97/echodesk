@@ -1,17 +1,11 @@
-from chroma_repository.collections import getCollection
-from bs4 import BeautifulSoup
 import requests
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 #from sentence_transformers import SentenceTransformer
-import chromadb 
 from chromadb.utils import embedding_functions
 from dateutil import parser
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import os
-import time
-import hashlib
 from utils.parser import extractText
 from services.ingestion import ingestContent
 
