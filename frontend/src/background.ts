@@ -107,7 +107,8 @@ const BLOCKED_DOMAINS = [
   "claude.ai",
   "anthropic.com",
   "luminous.ai",
-  "ollama.com"
+  "ollama.com",
+  "chatgpt.com"
 ];
 
 function isBlockedDomain(hostname: string): boolean {
